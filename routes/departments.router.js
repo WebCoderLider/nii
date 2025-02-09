@@ -4,7 +4,7 @@ const pool = require('../db');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-
+const fs = require('fs');
 const router = express.Router();
 
 const storage = multer.diskStorage({
@@ -18,7 +18,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.post('/create', verifyToken, upload.single('image'), async (req, res) => {
-    const { fullname, reseption, lunch, email, aboutUz, aboutEng, aboutRu, aboutQq, goalUz, goalRu, goalEng, goalQq } = req.body;
+    const { fullname, reseption, lunch, email, aboutUz, aboutEng, aboutRu, aboutQq, goalUz, goalRu, goalEng, goalQq, roleUz, roleRu, roleEng, roleQq } = req.body;
     const departmentId = uuidv4();
     const image = req.file;
 
@@ -31,9 +31,9 @@ router.post('/create', verifyToken, upload.single('image'), async (req, res) => 
 
         await pool.query(
             `INSERT INTO departments (
-                id, fullname, reseption, lunch, email, about_uz, about_eng, about_ru, about_qq, goal_uz, goal_ru, goal_eng, goal_qq, image_path
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-            [departmentId, fullname, reseption, lunch, email, aboutUz, aboutEng, aboutRu, aboutQq, goalUz, goalRu, goalEng, goalQq, formattedPath]
+                id, fullname, reseption, lunch, email, about_uz, about_eng, about_ru, about_qq, goal_uz, goal_ru, goal_eng, goal_qq, role_uz, role_ru, role_eng, role_qq, image_path
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+            [departmentId, fullname, reseption, lunch, email, aboutUz, aboutEng, aboutRu, aboutQq, goalUz, goalRu, goalEng, goalQq, roleUz, roleRu, roleEng, roleQq, formattedPath]
         );
 
         res.status(201).json({ message: 'Department created successfully', departmentId });
@@ -85,6 +85,7 @@ router.delete('/delete/:id', verifyToken, async (req, res) => {
             res.status(404).json({ message: 'Department not found' });
         }
     } catch (err) {
+        console.log(err)
         res.status(500).json({ message: 'Database error', error: err });
     }
 });

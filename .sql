@@ -1,5 +1,13 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+
+CREATE TABLE admins (
+    id UUID PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL
+);
+
+
 CREATE TABLE news (
     id UUID PRIMARY KEY,
     title_uz VARCHAR(255) NOT NULL,
@@ -26,11 +34,6 @@ CREATE TABLE directionstype (
     title_eng VARCHAR(255) NOT NULL,
     title_qq VARCHAR(255) NOT NULL
 );
-
-INSERT INTO directionstype (id, title_uz, title_ru, title_eng, title_qq) VALUES
-(uuid_generate_v4(), 'Kechki', 'Вечерний', 'Evening', 'Кешкі'),
-(uuid_generate_v4(), 'Kunduzgi', 'Дневной', 'Daytime', 'Күндізгі'),
-(uuid_generate_v4(), 'Sirqiy', 'Заочный', 'Correspondence', 'Сырттай');
 
 CREATE TABLE directions (
     id UUID PRIMARY KEY,
@@ -75,4 +78,47 @@ CREATE TABLE applications (
     location VARCHAR(255) NOT NULL,
     directionstype_id UUID REFERENCES directionstype(id) ON DELETE CASCADE,
     directions_id UUID REFERENCES directions(id) ON DELETE CASCADE
+);
+CREATE TABLE request_logs (
+    id UUID PRIMARY KEY,
+    ip_address VARCHAR(255) NOT NULL,
+    route VARCHAR(255) NOT NULL,
+    device VARCHAR(255) NOT NULL,
+    timestamp TIMESTAMP NOT NULL
+);
+
+ALTER TABLE departments ALTER COLUMN role_uz DROP DEFAULT;
+ALTER TABLE departments ALTER COLUMN role_ru DROP DEFAULT;
+ALTER TABLE departments ALTER COLUMN role_eng DROP DEFAULT;
+ALTER TABLE departments ALTER COLUMN role_qq DROP DEFAULT;
+
+CREATE TABLE home (
+    id UUID PRIMARY KEY,
+    title_uz VARCHAR(255) NOT NULL,
+    title_ru VARCHAR(255) NOT NULL,
+    title_eng VARCHAR(255) NOT NULL,
+    title_qq VARCHAR(255) NOT NULL,
+    description_uz VARCHAR(150) NOT NULL,
+    description_ru VARCHAR(150) NOT NULL,
+    description_eng VARCHAR(150) NOT NULL,
+    description_qq VARCHAR(150) NOT NULL
+);
+
+CREATE TABLE applyisopen (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    status BOOLEAN DEFAULT TRUE
+);
+
+INSERT INTO applyisopen (status) VALUES (true);
+
+CREATE TABLE contacts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    fullname VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    message VARCHAR(250) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address VARCHAR(255) NOT NULL,
+    device VARCHAR(255) NOT NULL,
+    latitude VARCHAR(255),
+    longitude VARCHAR(255)
 );

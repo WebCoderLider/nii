@@ -5,6 +5,7 @@ const pool = require('../db');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
 
@@ -32,26 +33,45 @@ const applyLimiter = rateLimit({
     keyGenerator: (req) => req.headers['x-forwarded-for'] || req.connection.remoteAddress,
     message: 'Siz bir marta'
 });
-
-router.post('/create',  upload.fields([
+router.get('/status', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT status FROM applyisopen LIMIT 1');
+        if (result.rows.length > 0) {
+            res.status(200).json(result.rows[0]);
+        } else {
+            res.status(404).json({ message: 'Status not found' });
+        }
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: 'Database error', error: err });
+    }
+});
+router.post('/create', applyLimiter, async (req, res, next) => {
+    try {
+        const statusResult = await pool.query('SELECT status FROM applyisopen LIMIT 1');
+        if (statusResult.rows.length > 0 && !statusResult.rows[0].status) {
+            return res.status(403).json({ message: 'Qabul yopilgan!' });
+        }
+        next();
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: 'Database error', error: err });
+    }
+}, upload.fields([
     { name: 'pasportFront', maxCount: 1 },
     { name: 'pasportBack', maxCount: 1 },
     { name: 'diplom', maxCount: 1 }
 ]), async (req, res) => {
     const { autolocation, lastname, firstname, middlename, phoneNumber, previousEducationalInstitution, viloyat, tuman, mahalla, location, directionstypeId, directionsId } = req.body;
-    const applicationId = uuidv4();
-    const pasportFront = req.files['pasportFront'][0];
-    const pasportBack = req.files['pasportBack'][0];
-    const diplom = req.files['diplom'][0];
+    if (!autolocation || !lastname || !firstname || !middlename || !phoneNumber || !previousEducationalInstitution || !viloyat || !tuman || !mahalla || !location || !directionstypeId || !directionsId) {
+        return res.status(400).json("Ma'lumotlar to'liq emas!");
+    }
 
     try {
-        if (!directionstypeId) {
-            return res.status(400).json({ message: "directionstypeId is required" });
-        }
-
-        if (!directionsId) {
-            return res.status(400).json({ message: "directionsId is required" });
-        }
+        const applicationId = uuidv4();
+        const pasportFront = req.files['pasportFront'][0];
+        const pasportBack = req.files['pasportBack'][0];
+        const diplom = req.files['diplom'][0];
 
         const pasportFrontPath = path.join('uploads/pasport/front', pasportFront.filename).replace(/\\/g, '/');
         const pasportBackPath = path.join('uploads/pasport/back', pasportBack.filename).replace(/\\/g, '/');
@@ -66,6 +86,7 @@ router.post('/create',  upload.fields([
 
         res.status(201).json({ message: 'Application submitted successfully', applicationId });
     } catch (err) {
+        console.log(err);
         res.status(500).json({ message: 'Database error', error: err });
     }
 });
@@ -74,7 +95,6 @@ router.get('/', verifyToken, async (req, res) => {
     try {
         const applicationsResult = await pool.query('SELECT * FROM applications');
         const applicationsList = applicationsResult.rows;
-
         res.status(200).json(applicationsList);
     } catch (err) {
         res.status(500).json({ message: 'Database error', error: err });
@@ -108,9 +128,16 @@ router.delete('/delete/:id', verifyToken, async (req, res) => {
             const pasportBackPath = applicationResult.rows[0].pasport_back_path;
             const diplomPath = applicationResult.rows[0].diplom_path;
 
-            fs.unlinkSync(path.join(__dirname, '..', pasportFrontPath));
-            fs.unlinkSync(path.join(__dirname, '..', pasportBackPath));
-            fs.unlinkSync(path.join(__dirname, '..', diplomPath));
+            console.log('Deleting files:', pasportFrontPath, pasportBackPath, diplomPath);
+            if (pasportFrontPath && fs.existsSync(path.join(__dirname, '..', pasportFrontPath)) && fs.lstatSync(path.join(__dirname, '..', pasportFrontPath)).isFile()) {
+                fs.unlinkSync(path.join(__dirname, '..', pasportFrontPath));
+            }
+            if (pasportBackPath && fs.existsSync(path.join(__dirname, '..', pasportBackPath)) && fs.lstatSync(path.join(__dirname, '..', pasportBackPath)).isFile()) {
+                fs.unlinkSync(path.join(__dirname, '..', pasportBackPath));
+            }
+            if (diplomPath && fs.existsSync(path.join(__dirname, '..', diplomPath)) && fs.lstatSync(path.join(__dirname, '..', diplomPath)).isFile()) {
+                fs.unlinkSync(path.join(__dirname, '..', diplomPath));
+            }
 
             await pool.query('DELETE FROM applications WHERE id = $1', [id]);
             res.status(200).json({ message: 'Application deleted successfully' });
@@ -118,8 +145,27 @@ router.delete('/delete/:id', verifyToken, async (req, res) => {
             res.status(404).json({ message: 'Application not found' });
         }
     } catch (err) {
+        console.log(err);
         res.status(500).json({ message: 'Database error', error: err });
     }
 });
+
+router.put('/status', verifyToken, async (req, res) => {
+    const { status } = req.body;
+
+    if (typeof status !== 'boolean') {
+        return res.status(400).json({ message: 'Invalid status type. It should be boolean.' });
+    }
+
+    try {
+        await pool.query('UPDATE applyisopen SET status = $1 WHERE id = (SELECT id FROM applyisopen LIMIT 1)', [status]);
+        res.status(200).json({ message: 'Status updated successfully' });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: 'Database error', error: err });
+    }
+});
+
+
 
 module.exports = router;

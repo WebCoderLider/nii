@@ -3,8 +3,9 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const pool = require('../pg');
-const verifyToken = require('../middleware/verifyToken');
+const pool = require('../db');
+const verifyToken = require('../middleware/verify');
+const fs = require('fs');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -81,11 +82,26 @@ router.post('/create', verifyToken, upload.single('image'), async (req, res) => 
 
 router.delete('/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
-
     try {
+        const result = await pool.query('SELECT image FROM leaders WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Leader not found' });
+        }
+        const imagePath = result.rows[0].image;
         await pool.query('DELETE FROM leaders WHERE id = $1', [id]);
+
+        if (imagePath) {
+            const fullImagePath = path.join(__dirname, '..', imagePath);
+
+            // Check if file exists and delete it
+            if (fs.existsSync(fullImagePath) && fs.lstatSync(fullImagePath).isFile()) {
+                fs.unlinkSync(fullImagePath);
+            }
+        }
+
         res.status(200).json({ message: 'Leader deleted successfully' });
     } catch (err) {
+        console.log(err);
         res.status(500).json({ message: 'Database error', error: err });
     }
 });
